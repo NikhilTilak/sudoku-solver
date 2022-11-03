@@ -6,7 +6,7 @@ The general algorithm of version 1.0 of the project is shown below.
 
 v1.0 only accepts a high quality digital image of the Sudoku from the top-down perspective.
 
-![version 1]("D:\Data Science\sudoku-solver\solver_v1.png")
+![version 1](solver_v1.png)
 
 
 Currently I am working on version 2 where the image is taken from a any angle using a camera.
@@ -17,7 +17,7 @@ At this stage the neural network model performs worse on data generated using th
 
 Improvements are ongoing. Keep an eye out for version 2.0.
 
-![version 2]("D:\Data Science\sudoku-solver\solver_v2.png")
+![version 2](solver_v2.png)
 
 The project is built using numpy, skimage and tensorflow.Keras.
 
