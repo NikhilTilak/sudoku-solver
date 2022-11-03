@@ -5,7 +5,7 @@ from skimage.io import imread
 from skimage.color import rgb2gray
 
 
-DATA_DIR = pathlib.Path.cwd().joinpath('data')
+DATA_DIR = pathlib.Path.cwd().parent.joinpath('data')
 
 def generate_dataset():
     data_image = []

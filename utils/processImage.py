@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Cursor
 from matplotlib.patches import Circle
 
-from solver import sudoku
+from utils.solver import sudoku
 
 def get_subimage(img, i, j):
     """returns an image of the sudoku box at index i,j
@@ -19,13 +19,14 @@ def get_subimage(img, i, j):
     simg=img[i*subimage_size:(i+1)*subimage_size,
               j*subimage_size:(j+1)*subimage_size]
     simg = simg[crop_margin:subimage_size-crop_margin, crop_margin:subimage_size-crop_margin] #crop center
-    simg = transform.resize(simg,(28,28),anti_aliasing=False) # resize
+    simg = transform.resize(simg,(28,28),anti_aliasing=False) # resize 
     simg=simg/255.0 #normalizing
     thresh = threshold_otsu(simg)#threshold to suppress background
-    simg[simg<thresh]=0.0
-    simg = 1-simg #invert contrast
-    if simg.mean()<1e-5:
+    simg[simg<thresh]=0.0 # background set to 0
+    simg = 1-simg #invert contrast black=1, white=0
+    if simg.mean()<1e-5: #changed from 1e-5 to 1e-10 more selective
         simg[:]=0
+
     return simg
 
 def plot_subimages(im: np.array):
@@ -36,7 +37,7 @@ def plot_subimages(im: np.array):
             ax[i,j].imshow(simg, cmap='gray')
             ax[i,j].axes.xaxis.set_ticklabels([])
             ax[i,j].axes.yaxis.set_ticklabels([])
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.show()
     return True 
 
@@ -112,19 +113,20 @@ def process_image(fp: str, unwarp=False):
         for j in range(9):
             simg=get_subimage(transformed_image, i,j)
             sub_images.append(simg)
-            if simg.mean()==0:
+            if simg.mean()==0: # 
                 num_to_find.remove(count)
             count+=1
 
     sub_images = np.asarray(sub_images)
 
     # model = keras.models.load_model(pathlib.Path.cwd().parent.joinpath('models','model.h5'))
-    model = keras.models.load_model("my_model")
+    model = keras.models.load_model("..\my_model")
 
     sudoku_predictions = model.predict(sub_images)
 
     # input_array = np.asarray([pred.argmax() if (pred.max()>0.8) else 0 for pred, idx in sudoku_predictions]).reshape(9,9)
     input_array = np.asarray([sudoku_predictions[i].argmax() if ((sudoku_predictions[i].max()>0.8) and (i in num_to_find)) else 0 for i in range(81)]).reshape(9,9)
+    # input_array = np.asarray([sudoku_predictions[i].argmax() if (i in num_to_find) else 0 for i in range(81)]).reshape(9,9)
 
     return sudoku(input_array)
 

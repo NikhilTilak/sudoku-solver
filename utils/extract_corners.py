@@ -1,9 +1,10 @@
-from processImage import unwarp_image
 import matplotlib.pyplot as plt
 from skimage.io import imread
 from skimage.color import rgb2gray
 
-fp = "D:\Data Science\sudoku-solver\sudoku_wiki.jpg"
+from utils.processImage import unwarp_image
+
+fp = "test_images\sudoku_wiki.jpg"
 
 image = imread(fp)
 image = rgb2gray(image[:,:,:3])*255.0

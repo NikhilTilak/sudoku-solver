@@ -1,5 +1,5 @@
 __pycache__
 .ipynb_checkpoints
 SudokuSolver.ipynb 
-my_model/*
+# my_model/*
 data/*
