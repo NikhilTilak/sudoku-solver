@@ -1,11 +1,12 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 # make a class for sudoku board
 class sudoku:
     def __init__(self, state: np.array):
         """ the state of the sudoku is a 9x9 array containing numbers from 0-9.
         0 represents an empty cell. """
-        sudoku.state = state
+        sudoku.state = state.astype(int)
         
     def __str__(self):
         return str(self.state)
@@ -18,7 +19,23 @@ class sudoku:
         return True
     
     def update_state(self, new_state):
-        self.state = new_state
+        self.state = new_state.astype(int)
+
+    def plot(self):
+        fig, ax = plt.subplots(9,9, figsize=(5,5))
+        for i in range(9):
+            for j in range(9):
+                if self.state[i,j]==0: text='' 
+                else: text= str(self.state[i,j])
+
+                ax[i,j].text(0.5,0.5,text, ha='center', va='center', c='b', font='Arial', size=15)
+                ax[i,j].set_aspect('equal')
+                ax[i,j].set_xticks([])
+                ax[i,j].set_yticks([])
+                ax[i,j].axes.xaxis.set_ticklabels([])
+                ax[i,j].axes.yaxis.set_ticklabels([])
+        plt.subplots_adjust(hspace=0.05, wspace=0.05)
+        plt.show()
 
 
 
@@ -70,7 +87,7 @@ def update(s: sudoku):
     for key, val in valid_numbers(s).items():
         if len(val)==1:
             i, j = int(key[0]), int(key[1])
-            update_matrix[i,j] = val.pop(0)
+            update_matrix[i,j] = int(val.pop(0))
     different_from_before = (update_matrix!=np.zeros((9,9))).any()
     s.update_state(s.state + update_matrix)
     return different_from_before
@@ -84,5 +101,5 @@ def solve_sudoku(s: sudoku):
         if not diff:
             break
     print(f"solved in {i} turns")
-    return s 
+    s.plot() 
           

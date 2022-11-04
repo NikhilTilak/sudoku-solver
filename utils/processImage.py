@@ -1,3 +1,5 @@
+import os
+import pathlib
 import numpy as np
 from skimage.io import imread
 from skimage.color import rgb2gray
@@ -9,6 +11,9 @@ from matplotlib.widgets import Cursor
 from matplotlib.patches import Circle
 
 from utils.solver import sudoku
+from utils.ocr import get_text_from_image
+
+
 
 def get_subimage(img, i, j):
     """returns an image of the sudoku box at index i,j
@@ -21,25 +26,45 @@ def get_subimage(img, i, j):
     simg = simg[crop_margin:subimage_size-crop_margin, crop_margin:subimage_size-crop_margin] #crop center
     simg = transform.resize(simg,(28,28),anti_aliasing=False) # resize 
     simg=simg/255.0 #normalizing
+    # print(f"after normalizing {np.mean(simg)}")
     thresh = threshold_otsu(simg)#threshold to suppress background
-    simg[simg<thresh]=0.0 # background set to 0
-    simg = 1-simg #invert contrast black=1, white=0
-    if simg.mean()<1e-5: #changed from 1e-5 to 1e-10 more selective
-        simg[:]=0
-
+    simg[simg<thresh]=0.0 # background=0 (brighter)
+    # print(f"after thresholding {np.mean(simg)}")
+    if simg.mean()>0.0039: simg[:]=0 # the image contains mostly white background. THIS THRESHOLD WAS FOUND EMPIRICALLY.
+    # print(f"after setting background to 0 {np.mean(simg)}")
+    simg = 1-simg #invert contrast such that background=1 (darker)
+    # print(f"after inversion {np.mean(simg)}")
     return simg
 
 def plot_subimages(im: np.array):
-    fig, ax = plt.subplots(9,9)
+    fig, ax = plt.subplots(9,9, figsize=(5,5))
     for i in range(9):
         for j in range(9):
             simg = get_subimage(im, i,j)
             ax[i,j].imshow(simg, cmap='gray')
+            ax[i,j].set_aspect('equal')
+            ax[i,j].set_xticks([])
+            ax[i,j].set_yticks([])
             ax[i,j].axes.xaxis.set_ticklabels([])
             ax[i,j].axes.yaxis.set_ticklabels([])
-    # plt.tight_layout()
+    plt.subplots_adjust(hspace=0.05, wspace=0.05)
     plt.show()
-    return True 
+
+def stitch_subimages(im: np.array):
+    """ takes a 540x540 transformed image and outputs stitched image of numbers to find."""
+    sub_images = []
+    num_to_find =list(range(81))
+    count=0
+    for i in range(9):
+        for j in range(9):
+            simg=get_subimage(im, i,j)
+            
+            if simg.mean()==1: # empty image
+                num_to_find.remove(count)
+            else: # non-empty image
+                sub_images.append(simg)
+            count+=1
+    return np.concatenate(sub_images, axis=1), num_to_find
 
 
 coords=[]
@@ -95,38 +120,52 @@ def unwarp_image(im: np.array):
     return unwarped
 
 
-def process_image(fp: str, unwarp=False):
+def process_image(fp: str, unwarp=False, use_ocr=True):
     """Takes filepath to image of sudoku and returns a sudoku object"""
+    TEST_IMAGES = pathlib.Path.cwd().parent.joinpath("test_images")
 
     image = imread(fp)
-    image = rgb2gray(image[:,:,:3])*255.0
+    image = rgb2gray(image[:,:,:3]) # removed *255.0
 
     if unwarp:
         transformed_image = unwarp_image(image)
     else:
         transformed_image = transform.resize(image,(540,540),anti_aliasing=False)
 
-    sub_images = []
-    num_to_find =list(range(81))
-    count=0
-    for i in range(9):
-        for j in range(9):
-            simg=get_subimage(transformed_image, i,j)
-            sub_images.append(simg)
-            if simg.mean()==0: # 
-                num_to_find.remove(count)
-            count+=1
+    if use_ocr:
+        #using OCR API for digit identification
+        stitched, num_to_find = stitch_subimages(transformed_image)
 
-    sub_images = np.asarray(sub_images)
+        plt.imshow(1-stitched, cmap='gray')
+        plt.axis('off')
+        plt.savefig(TEST_IMAGES.joinpath("tempfile.jpg"))
+        plt.show()
+        nums_in_image = get_text_from_image(TEST_IMAGES.joinpath("tempfile.jpg"))
+        nums_in_image= [int(n) for n in list(nums_in_image)]
+        input_array=np.zeros(81)
+        for i,v in enumerate(num_to_find):
+                input_array[v] = nums_in_image[i]
+        input_array = input_array.reshape(9,9)
+        os.remove(TEST_IMAGES.joinpath("tempfile.jpg"))
 
-    # model = keras.models.load_model(pathlib.Path.cwd().parent.joinpath('models','model.h5'))
-    model = keras.models.load_model("..\my_model")
-
-    sudoku_predictions = model.predict(sub_images)
-
-    # input_array = np.asarray([pred.argmax() if (pred.max()>0.8) else 0 for pred, idx in sudoku_predictions]).reshape(9,9)
-    input_array = np.asarray([sudoku_predictions[i].argmax() if ((sudoku_predictions[i].max()>0.8) and (i in num_to_find)) else 0 for i in range(81)]).reshape(9,9)
-    # input_array = np.asarray([sudoku_predictions[i].argmax() if (i in num_to_find) else 0 for i in range(81)]).reshape(9,9)
+    else:
+        sub_images = []
+        num_to_find =list(range(81))
+        count=0
+        for i in range(9):
+            for j in range(9):
+                simg=get_subimage(transformed_image, i,j)
+                sub_images.append(simg)
+                if simg.mean()==1: # Empty image
+                    num_to_find.remove(count)
+                count+=1
+        # use keras model to predict digits
+        model = keras.models.load_model("..\my_model")
+        sub_images = np.asarray(sub_images)
+        sudoku_predictions = model.predict(sub_images)
+        # input_array = np.asarray([pred.argmax() if (pred.max()>0.8) else 0 for pred, idx in sudoku_predictions]).reshape(9,9)
+        input_array = np.asarray([sudoku_predictions[i].argmax() if ((sudoku_predictions[i].max()>0.8) and (i in num_to_find)) else 0 for i in range(81)]).reshape(9,9)
+        # input_array = np.asarray([sudoku_predictions[i].argmax() if (i in num_to_find) else 0 for i in range(81)]).reshape(9,9)
 
     return sudoku(input_array)
 
