@@ -1,6 +1,7 @@
 import os
 import pathlib
 import numpy as np
+from scipy.ndimage import median_filter
 from skimage.io import imread
 from skimage.color import rgb2gray
 from skimage.filters import threshold_otsu
@@ -24,13 +25,15 @@ def get_subimage(img, i, j):
     simg=img[i*subimage_size:(i+1)*subimage_size,
               j*subimage_size:(j+1)*subimage_size]
     simg = simg[crop_margin:subimage_size-crop_margin, crop_margin:subimage_size-crop_margin] #crop center
-    simg = transform.resize(simg,(28,28),anti_aliasing=False) # resize 
-    simg=simg/255.0 #normalizing
+    simg = transform.resize(simg,(28,28),anti_aliasing=True) # resize 
+    # simg=simg/255.0 #normalizing
     # print(f"after normalizing {np.mean(simg)}")
     thresh = threshold_otsu(simg)#threshold to suppress background
     simg[simg<thresh]=0.0 # background=0 (brighter)
     # print(f"after thresholding {np.mean(simg)}")
-    if simg.mean()>0.0039: simg[:]=0 # the image contains mostly white background. THIS THRESHOLD WAS FOUND EMPIRICALLY.
+    # empirical_threshold = 0.0039 #THIS THRESHOLD WAS FOUND EMPIRICALLY before removing /255
+    empirical_threshold = 0.99 #THIS THRESHOLD WAS FOUND EMPIRICALLY before removing /255
+    if simg.mean()>empirical_threshold: simg[:]=0 # the image contains mostly white background. 
     # print(f"after setting background to 0 {np.mean(simg)}")
     simg = 1-simg #invert contrast such that background=1 (darker)
     # print(f"after inversion {np.mean(simg)}")
@@ -108,7 +111,7 @@ def unwarp_image(im: np.array):
 
     
 
-    FINAL_SIZE = 540 # chose a factor of 9 to make subimages easier to standardize.
+    FINAL_SIZE = 900 # chose a factor of 9 to make subimages easier to standardize.
     original_points = np.array([top_left, top_right, bottom_left, bottom_right])
     final_points = np.array([[0,0],[FINAL_SIZE,0],[0,FINAL_SIZE],[FINAL_SIZE, FINAL_SIZE]])
     holomorphic_transform= transform.estimate_transform('projective', original_points, final_points)
@@ -128,9 +131,9 @@ def process_image(fp: str, unwarp=False, use_ocr=True):
     image = rgb2gray(image[:,:,:3]) # removed *255.0
 
     if unwarp:
-        transformed_image = unwarp_image(image)
+        transformed_image = unwarp_image(image).resize(image,(540,540),anti_aliasing=True)
     else:
-        transformed_image = transform.resize(image,(540,540),anti_aliasing=False)
+        transformed_image = transform.resize(image,(540,540),anti_aliasing=True)
 
     if use_ocr:
         #using OCR API for digit identification

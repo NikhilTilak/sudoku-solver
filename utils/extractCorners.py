@@ -18,7 +18,7 @@ TEST_IMAGES = pathlib.Path.cwd().joinpath("test_images")
 fp=TEST_IMAGES.joinpath("sudoku_wiki.jpg")
 
 image = imread(fp)
-image = rgb2gray(image[:,:,:3])*255.0
+image = rgb2gray(image[:,:,:3])
 
 unwarped = unwarp_image(image)
 
