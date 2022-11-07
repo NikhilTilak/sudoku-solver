@@ -29,5 +29,8 @@ def get_text_from_image(filepath):
     result = result.content.decode()
     result = json.loads(result)
     text_in_image = result.get("ParsedResults")[0].get("ParsedText")
-    text_in_image = re.sub(r"\s+", '', str(text_in_image))
+    print(text_in_image)
+    text_in_image = re.sub(r"[^0-9]", '', str(text_in_image)) # remove any non-numeric characters
+    text_in_image = re.sub(r"\s+", '', str(text_in_image)) # remove spaces
+    print(text_in_image)
     return text_in_image

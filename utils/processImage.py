@@ -1,10 +1,11 @@
 import os
 import pathlib
 import numpy as np
+import cv2 as cv
 from scipy.ndimage import median_filter
 from skimage.io import imread
 from skimage.color import rgb2gray
-from skimage.filters import threshold_otsu
+from skimage.filters import threshold_otsu, gaussian
 from skimage import transform
 from tensorflow import keras
 import matplotlib.pyplot as plt
@@ -21,25 +22,29 @@ def get_subimage(img, i, j):
     i=0-9, j=0-9"""
     L = img.shape[0]
     subimage_size = L//9
-    crop_margin = int(0.075*subimage_size) #
+    crop_margin = int(0.1*subimage_size) # this is to avoid having any lines at the edges of the subimage
     simg=img[i*subimage_size:(i+1)*subimage_size,
               j*subimage_size:(j+1)*subimage_size]
     simg = simg[crop_margin:subimage_size-crop_margin, crop_margin:subimage_size-crop_margin] #crop center
-    simg = transform.resize(simg,(28,28),anti_aliasing=True) # resize 
-    # simg=simg/255.0 #normalizing
-    # print(f"after normalizing {np.mean(simg)}")
+    
+   
     thresh = threshold_otsu(simg)#threshold to suppress background
     simg[simg<thresh]=0.0 # background=0 (brighter)
-    # print(f"after thresholding {np.mean(simg)}")
-    # empirical_threshold = 0.0039 #THIS THRESHOLD WAS FOUND EMPIRICALLY before removing /255
-    empirical_threshold = 0.99 #THIS THRESHOLD WAS FOUND EMPIRICALLY before removing /255
-    if simg.mean()>empirical_threshold: simg[:]=0 # the image contains mostly white background. 
-    # print(f"after setting background to 0 {np.mean(simg)}")
+    simg[simg>=thresh]=1.0 # digit=1
+
+    simg = gaussian(simg, sigma=1, mode='constant', cval=1)
+    
+    if simg[subimage_size//4:subimage_size//2,subimage_size//4:subimage_size//2].mean()==1: simg[:]=0 # if center is purely 1, empty
+    if simg[subimage_size//4:subimage_size//2,subimage_size//4:subimage_size//2].mean()==0: simg[:]=0 # if center is purely 0, empty
+
+    simg = transform.resize(simg,(28,28),anti_aliasing=True) # resize 
+
     simg = 1-simg #invert contrast such that background=1 (darker)
-    # print(f"after inversion {np.mean(simg)}")
+    
     return simg
 
 def plot_subimages(im: np.array):
+    """Plots the subimages as a 9x9 grid"""
     fig, ax = plt.subplots(9,9, figsize=(5,5))
     for i in range(9):
         for j in range(9):
@@ -61,11 +66,10 @@ def stitch_subimages(im: np.array):
     for i in range(9):
         for j in range(9):
             simg=get_subimage(im, i,j)
-            
-            if simg.mean()==1: # empty image
+            if (simg[:]==1).all(): # empty image if only 1's.
                 num_to_find.remove(count)
             else: # non-empty image
-                sub_images.append(simg)
+                sub_images.append(gaussian(simg, sigma=0, mode='constant', cval=1))
             count+=1
     return np.concatenate(sub_images, axis=1), num_to_find
 
@@ -78,7 +82,6 @@ def get_corners(im: np.array):
     
     def extract_coords(event):
             #extract the coordinates of the 4 corners
-            # if event.inaxes==ax:
             ix = np.rint(event.xdata)
             iy = np.rint(event.ydata)
 
@@ -128,12 +131,14 @@ def process_image(fp: str, unwarp=False, use_ocr=True):
     TEST_IMAGES = pathlib.Path.cwd().parent.joinpath("test_images")
 
     image = imread(fp)
-    image = rgb2gray(image[:,:,:3]) # removed *255.0
+    image = rgb2gray(image[:,:,:3]) 
+    image = cv.fastNlMeansDenoising(np.uint8(image*255.0))
+    image = (image - image.min())/(image.max()-image.min())
 
     if unwarp:
         transformed_image = unwarp_image(image).resize(image,(540,540),anti_aliasing=True)
     else:
-        transformed_image = transform.resize(image,(540,540),anti_aliasing=True)
+        transformed_image = image
 
     if use_ocr:
         #using OCR API for digit identification
@@ -145,6 +150,11 @@ def process_image(fp: str, unwarp=False, use_ocr=True):
         plt.show()
         nums_in_image = get_text_from_image(TEST_IMAGES.joinpath("tempfile.jpg"))
         nums_in_image= [int(n) for n in list(nums_in_image)]
+
+        if len(nums_in_image)!=len(num_to_find):
+            print("error in identifying empty cell")
+            
+
         input_array=np.zeros(81)
         for i,v in enumerate(num_to_find):
                 input_array[v] = nums_in_image[i]
@@ -152,6 +162,7 @@ def process_image(fp: str, unwarp=False, use_ocr=True):
         os.remove(TEST_IMAGES.joinpath("tempfile.jpg"))
 
     else:
+        # using the neural network model for digit predictions
         sub_images = []
         num_to_find =list(range(81))
         count=0
@@ -166,10 +177,12 @@ def process_image(fp: str, unwarp=False, use_ocr=True):
         model = keras.models.load_model("..\my_model")
         sub_images = np.asarray(sub_images)
         sudoku_predictions = model.predict(sub_images)
-        # input_array = np.asarray([pred.argmax() if (pred.max()>0.8) else 0 for pred, idx in sudoku_predictions]).reshape(9,9)
+        
         input_array = np.asarray([sudoku_predictions[i].argmax() if ((sudoku_predictions[i].max()>0.8) and (i in num_to_find)) else 0 for i in range(81)]).reshape(9,9)
-        # input_array = np.asarray([sudoku_predictions[i].argmax() if (i in num_to_find) else 0 for i in range(81)]).reshape(9,9)
+        
 
     return sudoku(input_array)
+
+
 
 
