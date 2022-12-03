@@ -21,14 +21,18 @@ class sudoku:
     def update_state(self, new_state):
         self.state = new_state.astype(int)
 
-    def plot(self):
+    
+
+def plot_sudoku(s: sudoku, s_init=sudoku(np.zeros((9,9)))):
         fig, ax = plt.subplots(9,9, figsize=(5,5))
         for i in range(9):
             for j in range(9):
-                if self.state[i,j]==0: text='' 
-                else: text= str(self.state[i,j])
-
-                ax[i,j].text(0.5,0.5,text, ha='center', va='center', c='b', font='Arial', size=15)
+                if s.state[i,j]==0: text='' 
+                else: text= str(s.state[i,j])
+                if s_init.state[i,j]==0: #initially empty cell
+                    ax[i,j].text(0.5,0.5,text, ha='center', va='center', c='b', font='Arial', size=15)
+                else:
+                    ax[i,j].text(0.5,0.5,text, ha='center', va='center', c='k', font='Arial', size=15)
                 ax[i,j].set_aspect('equal')
                 ax[i,j].set_xticks([])
                 ax[i,j].set_yticks([])
@@ -36,8 +40,6 @@ class sudoku:
                 ax[i,j].axes.yaxis.set_ticklabels([])
         plt.subplots_adjust(hspace=0.05, wspace=0.05)
         plt.show()
-
-
 
 def box(s: sudoku, i: int, j: int)-> np.array:
     """ returns the 3x3 submatrix in which the (i,j) lie"""
@@ -93,6 +95,7 @@ def update(s: sudoku):
     return different_from_before
 
 def solve_sudoku(s: sudoku):
+    s_initial = sudoku(s.state)
     """Solve Sudoku """
     if not isinstance(s, sudoku):
         raise TypeError("Your input is not a sudoku object.")
@@ -100,6 +103,9 @@ def solve_sudoku(s: sudoku):
         diff = update(s)
         if not diff:
             break
-    print(f"solved in {i} turns")
-    s.plot() 
+    if i>0 and not ((s.state==0).any()):
+        print(f"solved in {i} turns")
+        plot_sudoku(s, s_initial)
+    else: 
+        print(f" beep boop, beep boop. Cannot compute. beep boop, beep boop.")
           

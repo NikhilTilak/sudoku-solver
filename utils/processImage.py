@@ -5,7 +5,7 @@ import cv2 as cv
 from scipy.ndimage import median_filter
 from skimage.io import imread
 from skimage.color import rgb2gray
-from skimage.filters import threshold_otsu, gaussian
+from skimage.filters import threshold_otsu, gaussian, threshold_mean
 from skimage import transform
 from tensorflow import keras
 import matplotlib.pyplot as plt
@@ -17,25 +17,54 @@ from utils.ocr import get_text_from_image
 
 
 
+# def get_subimage(img, i, j):
+#     """returns an image of the sudoku box at index i,j
+#     i=0-9, j=0-9"""
+#     L = img.shape[0]
+#     subimage_size = L//9
+#     crop_margin = int(0.1*subimage_size) # this is to avoid having any lines at the edges of the subimage
+#     simg=img[i*subimage_size:(i+1)*subimage_size,
+#               j*subimage_size:(j+1)*subimage_size]
+#     simg = simg[crop_margin:subimage_size-crop_margin, crop_margin:subimage_size-crop_margin] #crop center
+    
+   
+#     thresh = threshold_otsu(simg)#threshold to suppress background
+#     simg[simg<thresh]=0.0 # background=0 (brighter)
+#     simg[simg>=thresh]=1.0 # digit=1
+
+#     simg = gaussian(simg, sigma=1, mode='constant', cval=1)
+    
+#     if simg[subimage_size//4:subimage_size//2,subimage_size//4:subimage_size//2].mean()==1: simg[:]=0 # if center is purely 1, empty
+#     if simg[subimage_size//4:subimage_size//2,subimage_size//4:subimage_size//2].mean()==0: simg[:]=0 # if center is purely 0, empty
+
+#     simg = transform.resize(simg,(28,28),anti_aliasing=True) # resize 
+
+#     simg = 1-simg #invert contrast such that background=1 (darker)
+    
+#     return simg
+
 def get_subimage(img, i, j):
     """returns an image of the sudoku box at index i,j
     i=0-9, j=0-9"""
     L = img.shape[0]
     subimage_size = L//9
-    crop_margin = int(0.1*subimage_size) # this is to avoid having any lines at the edges of the subimage
-    simg=img[i*subimage_size:(i+1)*subimage_size,
-              j*subimage_size:(j+1)*subimage_size]
-    simg = simg[crop_margin:subimage_size-crop_margin, crop_margin:subimage_size-crop_margin] #crop center
-    
-   
-    thresh = threshold_otsu(simg)#threshold to suppress background
-    simg[simg<thresh]=0.0 # background=0 (brighter)
-    simg[simg>=thresh]=1.0 # digit=1
 
-    simg = gaussian(simg, sigma=1, mode='constant', cval=1)
-    
-    if simg[subimage_size//4:subimage_size//2,subimage_size//4:subimage_size//2].mean()==1: simg[:]=0 # if center is purely 1, empty
-    if simg[subimage_size//4:subimage_size//2,subimage_size//4:subimage_size//2].mean()==0: simg[:]=0 # if center is purely 0, empty
+    simg=img[i*subimage_size:(i+1)*subimage_size,
+                    j*subimage_size:(j+1)*subimage_size]
+
+    smaller_crop = int(0.25*subimage_size) # this is to avoid having any lines at the edges of the subimage
+    center_crop = simg[smaller_crop:subimage_size-smaller_crop, smaller_crop:subimage_size-smaller_crop] #crop center
+
+    larger_crop = int(0.1*subimage_size) # this is to avoid having any lines at the edges of the subimage
+    simg= simg[ larger_crop:subimage_size- larger_crop,  larger_crop:subimage_size- larger_crop] #crop center
+   
+    if np.std(center_crop) <50.0:
+            simg = np.ones(simg.shape)
+    else:
+        thresh = threshold_otsu(simg)#threshold to suppress background
+        simg[simg<thresh]=0.0 # background=0 (brighter)
+        simg[simg>=thresh]=1.0 # digit=1
+        # simg = (simg - simg.min())/(simg.max()-simg.min())
 
     simg = transform.resize(simg,(28,28),anti_aliasing=True) # resize 
 
@@ -49,7 +78,8 @@ def plot_subimages(im: np.array):
     for i in range(9):
         for j in range(9):
             simg = get_subimage(im, i,j)
-            ax[i,j].imshow(simg, cmap='gray')
+            ax[i,j].imshow(simg, cmap='viridis')
+            ax[i,j].text(0.25,0.25,f'{(simg[:]==0).all()}')
             ax[i,j].set_aspect('equal')
             ax[i,j].set_xticks([])
             ax[i,j].set_yticks([])
@@ -66,12 +96,15 @@ def stitch_subimages(im: np.array):
     for i in range(9):
         for j in range(9):
             simg=get_subimage(im, i,j)
-            if (simg[:]==1).all(): # empty image if only 1's.
+            if (simg[:]==0).all(): # empty image if only 0's.
                 num_to_find.remove(count)
             else: # non-empty image
-                sub_images.append(gaussian(simg, sigma=0, mode='constant', cval=1))
+                simg = transform.resize(simg,(128,128),anti_aliasing=True) # resize 
+                sub_images.append(simg[:,10:118])
+                # sub_images.append(gaussian(simg, sigma=0, mode='constant', cval=1))
             count+=1
-    return np.concatenate(sub_images, axis=1), num_to_find
+    stitched = np.concatenate(sub_images, axis=1)
+    return stitched, num_to_find
 
 
 coords=[]
@@ -133,17 +166,15 @@ def process_image(fp: str, unwarp=False, use_ocr=True):
     image = imread(fp)
     image = rgb2gray(image[:,:,:3]) 
     image = cv.fastNlMeansDenoising(np.uint8(image*255.0))
-    image = (image - image.min())/(image.max()-image.min())
 
     if unwarp:
-        transformed_image = unwarp_image(image).resize(image,(540,540),anti_aliasing=True)
+        transformed_image = transform.resize(unwarp_image(image),(540,540),anti_aliasing=True)
     else:
         transformed_image = image
 
     if use_ocr:
         #using OCR API for digit identification
         stitched, num_to_find = stitch_subimages(transformed_image)
-
         plt.imshow(1-stitched, cmap='gray')
         plt.axis('off')
         plt.savefig(TEST_IMAGES.joinpath("tempfile.jpg"))
@@ -151,8 +182,10 @@ def process_image(fp: str, unwarp=False, use_ocr=True):
         nums_in_image = get_text_from_image(TEST_IMAGES.joinpath("tempfile.jpg"))
         nums_in_image= [int(n) for n in list(nums_in_image)]
 
-        if len(nums_in_image)!=len(num_to_find):
+        if len(nums_in_image)<len(num_to_find):
             print("error in identifying empty cell")
+        if len(nums_in_image)>len(num_to_find):
+            print("error in OCR")
             
 
         input_array=np.zeros(81)

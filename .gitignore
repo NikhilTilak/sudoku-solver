@@ -1,6 +1,7 @@
 __pycache__
 .ipynb_checkpoints
 SudokuSolver.ipynb 
+cell_empty.ipynb
 # my_model/*
 data/*
 apikeys.py

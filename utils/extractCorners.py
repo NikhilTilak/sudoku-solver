@@ -15,7 +15,8 @@ from utils.processImage import unwarp_image
 
 TEST_IMAGES = pathlib.Path.cwd().joinpath("test_images")
 
-fp=TEST_IMAGES.joinpath("sudoku_wiki.jpg")
+# fp=TEST_IMAGES.joinpath("sudoku_wiki.jpg")
+fp=TEST_IMAGES.joinpath("sudoku_nyt.jpg")
 
 image = imread(fp)
 image = rgb2gray(image[:,:,:3])
