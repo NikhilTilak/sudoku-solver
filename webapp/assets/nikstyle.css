@@ -1,0 +1,36 @@
+body {
+    font-family: sans-serif;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: hotpink;
+    text-align: center;
+}
+
+a {
+    color: blue;
+}
+
+img {
+    width: 100%;
+    margin-bottom: 30px;
+  }
+
+.app-header {
+    height: 60px;
+    line-height: 60px;
+    border-bottom: thin lightgrey solid;
+}
+
+.app-header .app-header--title {
+    font-size: 50px;
+    padding-left: 5px;
+    text-align: center;
+}
+
+.column {
+    float: left;
+    width: 30%;
+    padding: 1%;
+  }
+  
+

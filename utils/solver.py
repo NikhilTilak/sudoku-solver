@@ -1,5 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2 as cv
+import pathlib
+import os
+# TEST_IMAGES = pathlib.Path.cwd().parent.joinpath("test_images")
+TEST_IMAGES = pathlib.Path("D:\Data Science\sudoku-solver\\test_images")
 
 # make a class for sudoku board
 class sudoku:
@@ -39,7 +44,14 @@ def plot_sudoku(s: sudoku, s_init=sudoku(np.zeros((9,9)))):
                 ax[i,j].axes.xaxis.set_ticklabels([])
                 ax[i,j].axes.yaxis.set_ticklabels([])
         plt.subplots_adjust(hspace=0.05, wspace=0.05)
-        plt.show()
+        temp_filepath = str(TEST_IMAGES.joinpath("solution_tempfile.jpg"))
+        fig.savefig(temp_filepath, bbox_inches='tight', pad_inches = 0)
+        plt.close()
+        sol_img = cv.imread(temp_filepath)
+        os.remove(temp_filepath)
+        return sol_img
+
+
 
 def box(s: sudoku, i: int, j: int)-> np.array:
     """ returns the 3x3 submatrix in which the (i,j) lie"""
@@ -105,7 +117,8 @@ def solve_sudoku(s: sudoku):
             break
     if i>0 and not ((s.state==0).any()):
         print(f"solved in {i} turns")
-        plot_sudoku(s, s_initial)
+        return plot_sudoku(s, s_initial)
     else: 
         print(f" beep boop, beep boop. Cannot compute. beep boop, beep boop.")
+        return plot_sudoku(s, s_initial)
           

@@ -43,9 +43,10 @@ from utils.ocr import get_text_from_image
     
 #     return simg
 
-def get_subimage(img, i, j):
+def get_subimage(im, i, j):
     """returns an image of the sudoku box at index i,j
     i=0-9, j=0-9"""
+    img = im.copy()
     L = img.shape[0]
     subimage_size = L//9
 
@@ -59,16 +60,13 @@ def get_subimage(img, i, j):
     simg= simg[ larger_crop:subimage_size- larger_crop,  larger_crop:subimage_size- larger_crop] #crop center
    
     if np.std(center_crop) <50.0:
-            simg = np.ones(simg.shape)
+            simg = np.ones(simg.shape)*255.0
     else:
         thresh = threshold_otsu(simg)#threshold to suppress background
         simg[simg<thresh]=0.0 # background=0 (brighter)
-        simg[simg>=thresh]=1.0 # digit=1
-        # simg = (simg - simg.min())/(simg.max()-simg.min())
+        simg[simg>=thresh]=255.0 # digit=1
 
-    simg = transform.resize(simg,(28,28),anti_aliasing=True) # resize 
-
-    simg = 1-simg #invert contrast such that background=1 (darker)
+    simg = 255.0-simg #invert contrast such that background=1 (darker)
     
     return simg
 
@@ -87,6 +85,18 @@ def plot_subimages(im: np.array):
             ax[i,j].axes.yaxis.set_ticklabels([])
     plt.subplots_adjust(hspace=0.05, wspace=0.05)
     plt.show()
+
+def get_all_subimages(im):
+    rows = []
+    for i in range(9):
+        cols = []
+        for j in range(9):
+            simg = get_subimage(im, i,j)
+            cols.append(simg)
+            if j<8: cols.append(np.ones((simg.shape[0], 5))*255.0)
+        rows.append(np.concatenate(cols, axis=1))
+        if i<8: rows.append(np.ones((5, rows[0].shape[1]))*255.0)
+    return np.concatenate(rows, axis=0)
 
 def stitch_subimages(im: np.array):
     """ takes a 540x540 transformed image and outputs stitched image of numbers to find."""
@@ -159,13 +169,15 @@ def unwarp_image(im: np.array):
     return unwarped
 
 
-def process_image(fp: str, unwarp=False, use_ocr=True):
-    """Takes filepath to image of sudoku and returns a sudoku object"""
-    TEST_IMAGES = pathlib.Path.cwd().parent.joinpath("test_images")
-
-    image = imread(fp)
-    image = rgb2gray(image[:,:,:3]) 
-    image = cv.fastNlMeansDenoising(np.uint8(image*255.0))
+def process_image(fp, unwarp=False, use_ocr=True, TEST_IMAGES=pathlib.Path("D:\Data Science\sudoku-solver\\test_images")):
+    """Takes filepath to image or numpy array of sudoku and returns a sudoku object"""
+    # TEST_IMAGES = pathlib.Path.cwd().parent.joinpath("test_images")
+    if type(fp)==np.ndarray:
+        image=fp
+    else:
+        image = imread(fp)
+        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        image = cv.fastNlMeansDenoising(np.uint8(image))
 
     if unwarp:
         transformed_image = transform.resize(unwarp_image(image),(540,540),anti_aliasing=True)
@@ -175,10 +187,10 @@ def process_image(fp: str, unwarp=False, use_ocr=True):
     if use_ocr:
         #using OCR API for digit identification
         stitched, num_to_find = stitch_subimages(transformed_image)
+        print(num_to_find)
         plt.imshow(1-stitched, cmap='gray')
         plt.axis('off')
         plt.savefig(TEST_IMAGES.joinpath("tempfile.jpg"))
-        plt.show()
         nums_in_image = get_text_from_image(TEST_IMAGES.joinpath("tempfile.jpg"))
         nums_in_image= [int(n) for n in list(nums_in_image)]
 
