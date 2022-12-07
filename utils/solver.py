@@ -74,7 +74,10 @@ def valid_numbers(s: sudoku):
 
                 for element in s.state[i,:]: # checking all the elements in the row i
                     if element!=0:
-                        valid.remove(element) # removing already filled in numbers 
+                        try:
+                            valid.remove(element)
+                        except ValueError:
+                            continue 
                         
                 for element in s.state[:,j]: # checking all the elements in the column j
                     if element!=0:
@@ -91,34 +94,231 @@ def valid_numbers(s: sudoku):
                             continue
                             
                 valid_numbers[f"{i}{j}"]=valid # dict containing all the valid moves
+
+            else: #already filled cell
+                valid_numbers[f"{i}{j}"]=[s.state[i,j]]
        
     return valid_numbers
                 
-    
-def update(s: sudoku):
-    """Helper function which updates the state of the sudoku after each interation of solving"""
-    update_matrix = np.zeros((9,9))
-    for key, val in valid_numbers(s).items():
-        if len(val)==1:
-            i, j = int(key[0]), int(key[1])
-            update_matrix[i,j] = int(val.pop(0))
-    different_from_before = (update_matrix!=np.zeros((9,9))).any()
-    s.update_state(s.state + update_matrix)
-    return different_from_before
 
-def solve_sudoku(s: sudoku):
-    s_initial = sudoku(s.state)
-    """Solve Sudoku """
-    if not isinstance(s, sudoku):
-        raise TypeError("Your input is not a sudoku object.")
-    for i in range(100):
-        diff = update(s)
-        if not diff:
+def solve_sudoku(s: sudoku, verbose=False):
+    s_input=sudoku(s.state)
+    iteration=0
+    solved = (s.state!=0).all()
+    max_iter=10
+
+    while not solved and (iteration<=max_iter):
+        iteration+=1
+        if verbose:print(20*"#"+f"Iter: {iteration} "+ 20*"#")
+
+        state_initial = s.state.copy()
+        update_matrix = s.state.copy()
+
+
+        val_nums = valid_numbers(s)
+        # for key, val in val_nums.items():
+        #     print(f"{key}:{val}\n")
+
+    ################# UNIQUE check #############################
+        for key, val in val_nums.items():
+            if len(val)==1:
+                i, j = int(key[0]), int(key[1])
+                update_matrix[i,j] = int(val[0])
+
+        if verbose:
+            print("uniqueness check")
+            print(update_matrix-s.state)
+
+    ################# ROW check #############################
+        for row in range(9):
+            for digit in range(1,10):
+                digit_count=0
+                digit_loc_col=0
+                for col in range(9):
+                    if digit in val_nums[f"{row}{col}"]:
+                        digit_count+=1
+                        digit_loc_col=col
+                if digit_count==1: #digit can be in excatly one place in this row
+                        update_matrix[row,digit_loc_col]=digit
+
+        if verbose:
+            print("row check")
+            print(update_matrix-s.state)
+
+    ################# COL check #############################
+        for col in range(9):
+            for digit in range(1,10):
+                digit_count=0
+                digit_loc_row=0
+                for row in range(9):
+                    if digit in val_nums[f"{row}{col}"]:
+                        digit_count+=1
+                        digit_loc_row=row
+
+                if digit_count==1: #digit can be in excatly one place in this column
+                        update_matrix[digit_loc_row,col]=digit
+        if verbose:
+            print("col check")
+            print(update_matrix-s.state)
+
+    ################# 3x3 BOX check #############################
+        for box_num in range(9):
+            rows_in_box = range(int(box_num/3)*3,(1+int(box_num/3))*3)
+            cols_in_box = range(((box_num%3))*3, ((box_num%3)+1)*3)
+
+            for digit in range(1,10):
+                digit_count=0
+                digit_loc_row=0
+                digit_loc_col=0
+                for row in rows_in_box:
+                    for col in cols_in_box:
+                        if digit in val_nums[f"{row}{col}"]:
+                            digit_count+=1
+                            digit_loc_row=row
+                            digit_loc_col=col
+
+                if digit_count==1: #digit can be in excatly one place in this 3x3 box
+                        update_matrix[digit_loc_row,digit_loc_col]=digit
+        if verbose:
+            print("3x3 box check")
+            print(update_matrix-s.state)
+
+        s.update_state(update_matrix)
+
+        if verbose:
+            print(f"s after iteration {iteration}")
+            print(s.state)
+
+        solved = (s.state!=0).all()
+        if solved:
+            if verbose:print(f"Solved after iteration {iteration} ? : {solved}")
+            return plot_sudoku(s, s_input)
+
+        changed = (update_matrix!=state_initial).any()
+        if verbose:print(f"Changed after iteration {iteration} ? : {changed}")
+        
+        if not changed:
+            if verbose:print("This one's too difficult for me.")
             break
-    if i>0 and not ((s.state==0).any()):
-        print(f"solved in {i} turns")
-        return plot_sudoku(s, s_initial)
-    else: 
-        print(f" beep boop, beep boop. Cannot compute. beep boop, beep boop.")
-        return plot_sudoku(s, s_initial)
-          
+        
+
+#----------------------------------------------------------------------------
+if __name__=="__main__":
+    input_array = np.array(
+    [[2, 0, 6, 5, 0, 0, 4, 1, 9],
+    [9, 0, 5, 0, 0, 2, 0, 0, 8],
+    [0, 0, 0, 3, 9, 4, 6, 0, 5],
+    [0, 5, 7, 4, 0, 0, 0, 6, 0],
+    [0, 1, 0, 9, 0, 8, 0, 4, 0],
+    [4, 0, 0, 0, 5, 0, 3, 8, 0],
+    [1, 7, 4, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 6, 7, 9, 0, 0, 0],
+    [0, 0, 9, 0, 4, 1, 8, 0, 3]]) #easy
+
+
+    #input_array = np.array(
+    # [[0, 0, 6, 0, 0, 0, 0, 1, 2],
+    #  [3, 0, 8, 0, 5, 0, 0, 0, 0],
+    #  [0, 0, 0, 7, 0, 4, 0, 0, 0],
+    #  [5, 0, 0, 6, 2, 0, 0, 0, 0],
+    #  [0, 0, 0, 0, 0, 7, 0, 0, 0],
+    #  [4, 1, 0, 0, 8, 0, 0, 0, 0],
+    #  [0, 9, 0, 5, 0, 0, 0, 8, 7],
+    #  [8, 0, 0, 0, 0, 2, 0, 0, 0],
+    #  [0, 0, 0, 0, 0, 0, 6, 0, 9]]) # medium
+
+    s = sudoku(input_array)
+
+    print("s initial\n")
+    print(s)
+    ############################################################
+    iteration=0
+    solved = (s.state!=0).all()
+    max_iter=10
+
+    while not solved and (iteration<=max_iter):
+        iteration+=1
+        print(20*"#"+f"Iter: {iteration} "+ 20*"#")
+
+        state_initial = s.state.copy()
+        update_matrix = s.state.copy()
+
+
+        val_nums = valid_numbers(s)
+        # for key, val in val_nums.items():
+        #     print(f"{key}:{val}\n")
+
+    ################# UNIQUE check #############################
+        for key, val in val_nums.items():
+            if len(val)==1:
+                i, j = int(key[0]), int(key[1])
+                update_matrix[i,j] = int(val[0])
+
+        print("uniqueness check")
+        print(update_matrix-s.state)
+
+    ################# ROW check #############################
+        for row in range(9):
+            for digit in range(1,10):
+                digit_count=0
+                digit_loc_col=0
+                for col in range(9):
+                    if digit in val_nums[f"{row}{col}"]:
+                        digit_count+=1
+                        digit_loc_col=col
+                if digit_count==1: #digit can be in excatly one place in this row
+                        update_matrix[row,digit_loc_col]=digit
+
+        print("row check")
+        print(update_matrix-s.state)
+
+    ################# COL check #############################
+        for col in range(9):
+            for digit in range(1,10):
+                digit_count=0
+                digit_loc_row=0
+                for row in range(9):
+                    if digit in val_nums[f"{row}{col}"]:
+                        digit_count+=1
+                        digit_loc_row=row
+
+                if digit_count==1: #digit can be in excatly one place in this column
+                        update_matrix[digit_loc_row,col]=digit
+
+        print("col check")
+        print(update_matrix-s.state)
+
+    ################# 3x3 BOX check #############################
+        for box_num in range(9):
+            rows_in_box = range(int(box_num/3)*3,(1+int(box_num/3))*3)
+            cols_in_box = range(((box_num%3))*3, ((box_num%3)+1)*3)
+
+            for digit in range(1,10):
+                digit_count=0
+                digit_loc_row=0
+                digit_loc_col=0
+                for row in rows_in_box:
+                    for col in cols_in_box:
+                        if digit in val_nums[f"{row}{col}"]:
+                            digit_count+=1
+                            digit_loc_row=row
+                            digit_loc_col=col
+
+                if digit_count==1: #digit can be in excatly one place in this 3x3 box
+                        update_matrix[digit_loc_row,digit_loc_col]=digit
+        print("3x3 box check")
+        print(update_matrix-s.state)
+
+        s.update_state(update_matrix)
+
+        print(f"s after iteration {iteration}")
+        print(s.state)
+
+        solved = (s.state!=0).all()
+        print(f"Solved after iteration {iteration} ? : {solved}")
+
+        changed = (update_matrix!=state_initial).any()
+        print(f"Changed after iteration {iteration} ? : {changed}")
+        if not changed:
+            print("This one's too difficult for me.")
+            break
