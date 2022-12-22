@@ -1,6 +1,9 @@
+Update December 2022: The [SudokuSolver app](https://sudoku-solver-2ik3k7t6qq-uk.a.run.app) is now live!
+![app_screenshot](assets/solver_app-screenshot.jpg)
+
 Thanks for checking out my Sudoku-Solver.
 
-The challenge is to correctly solve a Sudoku given an image of the Sudoku.
+The aim is to correctly solve a Sudoku puzzle given its image.
 
 The general algorithm of version 1.0 of the project is shown below. 
 
@@ -20,7 +23,5 @@ Improvements are ongoing. Keep an eye out for version 2.0.
 ![version 2](assets/solver_v2.jpg)
 
 The project is built using numpy, skimage and tensorflow.Keras.
-
-The neural network was trained on a [dataset](https://www.kaggle.com/datasets/kshitijdhama/printed-digits-dataset) containing printed digits from Kaggle.
 
 OCR was performed using a free api service.
