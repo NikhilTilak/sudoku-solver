@@ -1,5 +1,6 @@
 Update December 2022: The [SudokuSolver app](https://sudoku-solver-2ik3k7t6qq-uk.a.run.app) is now live!
-![app_screenshot](assets/solver_app-screenshot.jpg)
+
+![app_screenshot](assets/solver-app-screenshot.jpg)
 
 Thanks for checking out my Sudoku-Solver.
 
